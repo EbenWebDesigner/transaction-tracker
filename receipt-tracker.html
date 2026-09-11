@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Receipts — Transaction Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<style>
+  :root{
+    --bg: #17171b;
+    --surface: #201f25;
+    --surface-2: #29282f;
+    --border: #35343c;
+    --text: #f1f0f4;
+    --text-dim: #96939f;
+    --text-faint: #66636e;
+    --purple: #7b5cfa;
+    --purple-soft: rgba(123,92,250,0.16);
+    --purple-line: rgba(123,92,250,0.4);
+    --danger: #ff7a7a;
+
+    --c-groceries: #7cd992;
+    --c-bills: #ffb86b;
+    --c-gym: #7b5cfa;
+    --c-eatingout: #ff8fa3;
+    --c-transport: #6fd3f0;
+    --c-shopping: #f2c94c;
+    --c-other: #96939f;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body{
+    display: flex;
+    justify-content: center;
+  }
+
+  #app{
+    width: 100%;
+    max-width: 520px;
+    min-height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    position: relative;
+    padding-bottom: 96px;
+  }
+
+  h1, h2, h3, .num{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 8px;
+  }
+  header h1{ font-size: 20px; letter-spacing: -0.01em; }
+  .icon-btn{
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .icon-btn:hover{ color: var(--text); border-color: var(--purple-line); }
+
+  /* ---------- Period switcher ---------- */
+  .period-bar{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px 0;
+  }
+  .segmented{
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .segmented button{
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .segmented button.active{
+    background: var(--purple);
+    color: #fff;
+  }
+  .nav-arrows{ display: flex; align-items: center; gap: 4px; }
+  .nav-arrows button{
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-arrows button:hover{ color: var(--text); }
+  .range-label{
+    font-size: 12px;
+    color: var(--text-faint);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* ---------- Hero total ---------- */
+  .hero{
+    padding: 22px 20px 6px;
+    text-align: center;
+  }
+  .hero .amount{
+    font-size: 52px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero .caption{
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* ---------- Category breakdown ---------- */
+  .breakdown{ padding: 20px 20px 4px; }
+  .breakdown-row{
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0;
+  }
+  .dot{ width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .breakdown-row .label{ font-size: 13px; color: var(--text-dim); width: 92px; flex: none; }
+  .bar-track{
+    flex: 1; height: 6px; background: var(--surface-2);
+    border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill{ height: 100%; border-radius: 4px; }
+  .breakdown-row .val{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 600;
+    width: 68px; text-align: right; flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Section heading ---------- */
+  .section-heading{
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 24px 20px 8px;
+  }
+  .section-heading h2{ font-size: 15px; color: var(--text-dim); font-weight: 500; }
+
+  /* ---------- Transaction list ---------- */
+  .tx-list{ padding: 0 20px; }
+  .tx-day{
+    font-size: 11px;
+    color: var(--text-faint);
+    padding: 14px 0 6px;
+    border-top: 1px solid var(--border);
+  }
+  .tx-day:first-child{ border-top: none; }
+  .tx-row{
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 0;
+    cursor: pointer;
+  }
+  .tx-swatch{
+    width: 34px; height: 34px; border-radius: 9px;
+    flex: none; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: #17171b;
+  }
+  .tx-info{ flex: 1; min-width: 0; }
+  .tx-merchant{ font-size: 14px; font-weight: 500; }
+  .tx-cat{ font-size: 12px; color: var(--text-faint); margin-top: 1px; }
+  .tx-amount{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14.5px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .empty-state{
+    text-align: center;
+    padding: 40px 20px 20px;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+
+  /* ---------- FAB ---------- */
+  .fab{
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(calc(-50% + 0px));
+    margin-left: 0;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--purple);
+    color: #fff;
+    border: none;
+    font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(123,92,250,0.4);
+    max-width: 520px;
+  }
+  @media (min-width: 521px){
+    .fab{ left: 50%; margin-left: 200px; }
+  }
+
+  /* ---------- Overlay / sheet ---------- */
+  .overlay{
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .overlay.open{ display: flex; }
+  .sheet{
+    width: 100%; max-width: 520px;
+    background: var(--surface);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 18px 20px 28px;
+    animation: slideUp .22s ease-out;
+  }
+  @keyframes slideUp{ from{ transform: translateY(24px); opacity: 0; } to{ transform: translateY(0); opacity: 1; } }
+  .sheet-handle{
+    width: 36px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 14px;
+  }
+  .sheet-title{ font-size: 17px; margin-bottom: 14px; }
+
+  .tabs{ display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button{
+    flex: 1;
+    padding: 9px 0;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-family: 'Inter'; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  .tabs button.active{ background: var(--purple-soft); border-color: var(--purple-line); color: var(--text); }
+
+  .field{ margin-bottom: 14px; }
+  .field label{
+    display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px;
+  }
+  .field input, .field select, .field textarea{
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text);
+    font-family: 'Inter';
+    font-size: 14.5px;
+    padding: 10px 12px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline: none; border-color: var(--purple-line);
+  }
+  .field-row{ display: flex; gap: 10px; }
+  .field-row .field{ flex: 1; }
+
+  .primary-btn{
+    width: 100%;
+    background: var(--purple);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 0;
+    font-family: 'Inter'; font-size: 14.5px; font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .primary-btn:disabled{ opacity: 0.5; cursor: not-allowed; }
+  .ghost-btn{
+    width: 100%;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 0;
+    font-family: 'Inter'; font-size: 13.5px; font-weight: 500;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  .photo-drop{
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 26px 16px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    background: var(--surface-2);
+  }
+  .photo-drop:hover{ border-color: var(--purple-line); }
+  .photo-preview{ width: 100%; max-height: 200px; object-fit: contain; border-radius: 10px; margin-bottom: 12px; }
+  .ocr-status{
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text-dim);
+    padding: 12px 0;
+  }
+  .spinner{
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--purple);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex: none;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  .ocr-note{ font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+
+  /* settings */
+  .rule-row, .cat-row{
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rule-row input{ flex: 1; }
+  .rule-row select{ width: 128px; flex: none; }
+  .cat-row input[type=text]{ flex: 1; }
+  .cat-row input[type=color]{
+    width: 30px; height: 30px; border: none; background: none; padding: 0; border-radius: 8px; flex: none;
+  }
+  .small-x{
+    width: 26px; height: 26px; flex: none;
+    border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-faint);
+    cursor: pointer; font-size: 13px;
+  }
+  .small-x:hover{ color: var(--danger); border-color: var(--danger); }
+  .add-row-btn{
+    margin-top: 10px;
+    font-size: 13px; color: var(--purple);
+    background: none; border: none; cursor: pointer; padding: 0;
+    font-weight: 500;
+  }
+
+  .close-x{
+    position: absolute; top: 16px; right: 18px;
+    color: var(--text-faint); background: none; border: none;
+    font-size: 20px; cursor: pointer;
+  }
+  .sheet{ position: relative; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>Receipts</h1>
+    <button class="icon-btn" id="settingsBtn" title="Categories &amp; rules" aria-label="Settings">⚙</button>
+  </header>
+
+  <div class="period-bar">
+    <div class="segmented" id="periodToggle">
+      <button data-mode="week" class="active">Week</button>
+      <button data-mode="month">Month</button>
+    </div>
+    <div class="nav-arrows">
+      <button id="prevPeriod">‹</button>
+      <button id="nextPeriod">›</button>
+    </div>
+  </div>
+  <div class="range-label" id="rangeLabel"></div>
+
+  <div class="hero">
+    <div class="amount num" id="heroTotal">£0.00</div>
+    <div class="caption" id="heroCaption">spent this week</div>
+  </div>
+
+  <div class="breakdown" id="breakdown"></div>
+
+  <div class="section-heading">
+    <h2>Transactions</h2>
+  </div>
+  <div class="tx-list" id="txList"></div>
+
+  <button class="fab" id="addBtn" aria-label="Add transaction">+</button>
+
+  <!-- ADD TRANSACTION SHEET -->
+  <div class="overlay" id="addOverlay">
+    <div class="sheet">
+      <button class="close-x" data-close="addOverlay">✕</button>
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add a transaction</div>
+
+      <div class="tabs">
+        <button data-tab="manual" class="active">Type it in</button>
+        <button data-tab="photo">Snap a receipt</button>
+      </div>
+
+      <!-- Manual tab -->
+      <form id="manualForm">
+        <div class="field">
+          <label for="f-merchant">Merchant</label>
+          <input id="f-merchant" type="text" placeholder="e.g. Pure Gym" autocomplete="off" required>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-amount">Amount (£)</label>
+            <input id="f-amount" type="number" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+          <div class="field">
+            <label for="f-date">Date</label>
+            <input id="f-date" type="date" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-category">Category</label>
+          <select id="f-category"></select>
+        </div>
+        <div class="field">
+          <label for="f-note">Note (optional)</label>
+          <input id="f-note" type="text" placeholder="Add a detail...">
+        </div>
+        <button type="submit" class="primary-btn">Save transaction</button>
+      </form>
+
+      <!-- Photo tab -->
+      <div id="photoTab" style="display:none;">
+        <div id="photoDropZone">
+          <label class="photo-drop" style="display:block;">
+            📷 Tap to take or choose a photo of your receipt
+            <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none;">
+          </label>
+        </div>
+        <div id="photoResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS SHEET -->
+  <div class="overlay" id="settingsOverlay">
+    <div class="sheet">
+      <button class="close-x" data-close="settingsOverlay">✕</button>
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Categories</div>
+      <div id="categoryList"></div>
+      <button class="add-row-btn" id="addCategoryBtn">+ Add category</button>
+
+      <div class="sheet-title" style="margin-top: 26px;">Auto-categorise rules</div>
+      <div class="ocr-note" style="margin-bottom:10px;">When a merchant name contains this text, the category fills in automatically — for both manual entry and photo scans.</div>
+      <div id="ruleList"></div>
+      <button class="add-row-btn" id="addRuleBtn">+ Add rule</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "receiptTracker.v1";
+
+  var DEFAULT_CATEGORIES = [
+    { id: "groceries", name: "Groceries", color: "#7cd992" },
+    { id: "bills", name: "Bills", color: "#ffb86b" },
+    { id: "gym", name: "Gym", color: "#7b5cfa" },
+    { id: "eatingout", name: "Eating Out", color: "#ff8fa3" },
+    { id: "transport", name: "Transport", color: "#6fd3f0" },
+    { id: "shopping", name: "Shopping", color: "#f2c94c" },
+    { id: "other", name: "Other", color: "#96939f" }
+  ];
+
+  var DEFAULT_RULES = [
+    { keyword: "pure gym", categoryId: "gym" },
+    { keyword: "gym", categoryId: "gym" },
+    { keyword: "tesco", categoryId: "groceries" },
+    { keyword: "sainsbury", categoryId: "groceries" },
+    { keyword: "asda", categoryId: "groceries" },
+    { keyword: "aldi", categoryId: "groceries" },
+    { keyword: "lidl", categoryId: "groceries" },
+    { keyword: "uber", categoryId: "transport" },
+    { keyword: "trainline", categoryId: "transport" },
+    { keyword: "tfl", categoryId: "transport" },
+    { keyword: "costa", categoryId: "eatingout" },
+    { keyword: "starbucks", categoryId: "eatingout" },
+    { keyword: "mcdonald", categoryId: "eatingout" },
+    { keyword: "netflix", categoryId: "bills" },
+    { keyword: "spotify", categoryId: "bills" },
+    { keyword: "electric", categoryId: "bills" }
+  ];
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return {
+      categories: DEFAULT_CATEGORIES.slice(),
+      rules: DEFAULT_RULES.slice(),
+      transactions: []
+    };
+  }
+
+  function saveState(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  var state = loadState();
+  var mode = "week"; // 'week' | 'month'
+  var refDate = new Date(); refDate.setHours(0,0,0,0);
+
+  // ---------- date helpers ----------
+  function fmtISO(d){
+    var y=d.getFullYear(), m=(d.getMonth()+1+"").padStart(2,"0"), day=(d.getDate()+"").padStart(2,"0");
+    return y+"-"+m+"-"+day;
+  }
+  function parseISO(s){
+    var parts = s.split("-");
+    return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  }
+  function startOfWeekMonday(d){
+    var day = d.getDay(); // 0 Sun .. 6 Sat
+    var diff = (day === 0 ? -6 : 1 - day);
+    var monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    monday.setHours(0,0,0,0);
+    return monday;
+  }
+  function addDays(d, n){ var r = new Date(d); r.setDate(r.getDate()+n); return r; }
+  function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+
+  function currentRange(){
+    if(mode === "week"){
+      var start = startOfWeekMonday(refDate);
+      var end = addDays(start, 6);
+      return { start: start, end: end };
+    }else{
+      return { start: startOfMonth(refDate), end: endOfMonth(refDate) };
+    }
+  }
+
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function rangeLabel(range){
+    if(mode === "week"){
+      var s = range.start, e = range.end;
+      if(s.getMonth() === e.getMonth()){
+        return MONTHS_SHORT[s.getMonth()] + " " + s.getDate() + "–" + e.getDate();
+      }
+      return MONTHS_SHORT[s.getMonth()] + " " + s.getDate() + " – " + MONTHS_SHORT[e.getMonth()] + " " + e.getDate();
+    }else{
+      return MONTHS[refDate.getMonth()] + " " + refDate.getFullYear();
+    }
+  }
+
+  // ---------- categories ----------
+  function catById(id){
+    for(var i=0;i<state.categories.length;i++) if(state.categories[i].id === id) return state.categories[i];
+    return state.categories[state.categories.length-1];
+  }
+
+  function guessCategoryId(merchant){
+    var m = (merchant||"").toLowerCase();
+    for(var i=0;i<state.rules.length;i++){
+      if(m.indexOf(state.rules[i].keyword.toLowerCase()) !== -1){
+        return state.rules[i].categoryId;
+      }
+    }
+    return null;
+  }
+
+  function populateCategorySelect(sel, selectedId){
+    sel.innerHTML = "";
+    state.categories.forEach(function(c){
+      var opt = document.createElement("option");
+      opt.value = c.id; opt.textContent = c.name;
+      if(c.id === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ---------- rendering ----------
+  function money(n){
+    return "£" + n.toFixed(2);
+  }
+
+  function render(){
+    var range = currentRange();
+    document.getElementById("rangeLabel").textContent = rangeLabel(range);
+    document.getElementById("heroCaption").textContent = "spent this " + mode;
+
+    var startISO = fmtISO(range.start), endISO = fmtISO(range.end);
+    var txs = state.transactions.filter(function(t){ return t.date >= startISO && t.date <= endISO; });
+    txs.sort(function(a,b){ return b.date.localeCompare(a.date) || b.createdAt - a.createdAt; });
+
+    var total = txs.reduce(function(s,t){ return s + t.amount; }, 0);
+    document.getElementById("heroTotal").textContent = money(total);
+
+    // breakdown by category
+    var byCat = {};
+    txs.forEach(function(t){
+      byCat[t.categoryId] = (byCat[t.categoryId]||0) + t.amount;
+    });
+    var rows = Object.keys(byCat).map(function(id){ return { cat: catById(id), amount: byCat[id] }; });
+    rows.sort(function(a,b){ return b.amount - a.amount; });
+    var max = rows.length ? rows[0].amount : 0;
+
+    var bd = document.getElementById("breakdown");
+    bd.innerHTML = "";
+    rows.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "breakdown-row";
+      row.innerHTML =
+        '<span class="dot" style="background:'+r.cat.color+'"></span>' +
+        '<span class="label">'+r.cat.name+'</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:'+ (max? (r.amount/max*100):0) +'%; background:'+r.cat.color+'"></span></span>' +
+        '<span class="val">'+money(r.amount)+'</span>';
+      bd.appendChild(row);
+    });
+
+    // transaction list grouped by day
+    var list = document.getElementById("txList");
+    list.innerHTML = "";
+    if(txs.length === 0){
+      list.innerHTML = '<div class="empty-state">No transactions in this '+mode+' yet. Tap + to add one.</div>';
+    }else{
+      var lastDay = null;
+      txs.forEach(function(t){
+        if(t.date !== lastDay){
+          lastDay = t.date;
+          var d = parseISO(t.date);
+          var dayHeader = document.createElement("div");
+          dayHeader.className = "tx-day";
+          var today = fmtISO(new Date());
+          var label = (t.date === today) ? "Today" : (d.toLocaleDateString(undefined,{ weekday:'short'}) + ", " + MONTHS_SHORT[d.getMonth()] + " " + d.getDate());
+          dayHeader.textContent = label;
+          list.appendChild(dayHeader);
+        }
+        var cat = catById(t.categoryId);
+        var row = document.createElement("div");
+        row.className = "tx-row";
+        row.dataset.id = t.id;
+        row.innerHTML =
+          '<div class="tx-swatch" style="background:'+cat.color+'">'+ (cat.name[0]||"?") +'</div>' +
+          '<div class="tx-info"><div class="tx-merchant">'+escapeHtml(t.merchant)+'</div><div class="tx-cat">'+cat.name+(t.note? " · "+escapeHtml(t.note):"")+'</div></div>' +
+          '<div class="tx-amount">'+money(t.amount)+'</div>';
+        row.addEventListener("click", function(){
+          if(confirm("Delete this transaction (\""+t.merchant+"\", "+money(t.amount)+")?")){
+            state.transactions = state.transactions.filter(function(x){ return x.id !== t.id; });
+            saveState(); render();
+          }
+        });
+        list.appendChild(row);
+      });
+    }
+  }
+
+  function escapeHtml(s){
+    var d = document.createElement("div"); d.textContent = s||""; return d.innerHTML;
+  }
+
+  // ---------- period controls ----------
+  document.getElementById("periodToggle").addEventListener("click", function(e){
+    var btn = e.target.closest("button"); if(!btn) return;
+    mode = btn.dataset.mode;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function(b){ b.classList.toggle("active", b === btn); });
+    render();
+  });
+  document.getElementById("prevPeriod").addEventListener("click", function(){
+    refDate = mode === "week" ? addDays(refDate, -7) : new Date(refDate.getFullYear(), refDate.getMonth()-1, 1);
+    render();
+  });
+  document.getElementById("nextPeriod").addEventListener("click", function(){
+    refDate = mode === "week" ? addDays(refDate, 7) : new Date(refDate.getFullYear(), refDate.getMonth()+1, 1);
+    render();
+  });
+
+  // ---------- add transaction sheet ----------
+  var addOverlay = document.getElementById("addOverlay");
+  var manualForm = document.getElementById("manualForm");
+  var photoTab = document.getElementById("photoTab");
+
+  document.getElementById("addBtn").addEventListener("click", function(){
+    populateCategorySelect(document.getElementById("f-category"), null);
+    document.getElementById("f-date").value = fmtISO(new Date());
+    document.getElementById("f-merchant").value = "";
+    document.getElementById("f-amount").value = "";
+    document.getElementById("f-note").value = "";
+    document.getElementById("photoResult").innerHTML = "";
+    document.getElementById("photoInput").value = "";
+    switchTab("manual");
+    addOverlay.classList.add("open");
+  });
+
+  document.querySelectorAll("[data-close]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.getElementById(btn.dataset.close).classList.remove("open");
+    });
+  });
+  addOverlay.addEventListener("click", function(e){ if(e.target === addOverlay) addOverlay.classList.remove("open"); });
+
+  function switchTab(name){
+    document.querySelectorAll(".tabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === name); });
+    manualForm.style.display = name === "manual" ? "block" : "none";
+    photoTab.style.display = name === "photo" ? "block" : "none";
+  }
+  document.querySelectorAll(".tabs button").forEach(function(b){
+    b.addEventListener("click", function(){ switchTab(b.dataset.tab); });
+  });
+
+  manualForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var merchant = document.getElementById("f-merchant").value.trim();
+    var amount = parseFloat(document.getElementById("f-amount").value);
+    var date = document.getElementById("f-date").value;
+    var categoryId = document.getElementById("f-category").value;
+    var note = document.getElementById("f-note").value.trim();
+    if(!merchant || isNaN(amount) || !date) return;
+    state.transactions.push({ id: uid(), merchant: merchant, amount: amount, date: date, categoryId: categoryId, note: note, createdAt: Date.now() });
+    saveState();
+    addOverlay.classList.remove("open");
+    render();
+  });
+
+  // merchant field: live-guess category as user types
+  document.getElementById("f-merchant").addEventListener("input", function(){
+    var guess = guessCategoryId(this.value);
+    if(guess){ document.getElementById("f-category").value = guess; }
+  });
+
+  // ---------- photo / OCR ----------
+  document.getElementById("photoInput").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var resultBox = document.getElementById("photoResult");
+    var imgUrl = URL.createObjectURL(file);
+    resultBox.innerHTML =
+      '<img class="photo-preview" src="'+imgUrl+'">' +
+      '<div class="ocr-status"><span class="spinner"></span><span>Reading your receipt…</span></div>';
+
+    if(typeof Tesseract === "undefined"){
+      showOcrFailure(resultBox, imgUrl);
+      return;
+    }
+
+    Tesseract.recognize(file, "eng")
+      .then(function(result){
+        var text = (result && result.data && result.data.text) || "";
+        var parsed = parseReceiptText(text);
+        showOcrConfirm(resultBox, imgUrl, parsed);
+      })
+      .catch(function(){
+        showOcrFailure(resultBox, imgUrl);
+      });
+  });
+
+  function parseReceiptText(text){
+    var lines = text.split("\n").map(function(l){ return l.trim(); }).filter(Boolean);
+    // merchant guess: first substantial line near the top
+    var merchant = "";
+    for(var i=0;i<lines.length;i++){
+      if(lines[i].replace(/[^a-zA-Z]/g,"").length >= 3){ merchant = lines[i]; break; }
+    }
+    // amount guess: prefer a line containing "total", else the largest currency-looking number
+    var amountRegex = /(?:£|GBP)?\s?(\d{1,4}[.,]\d{2})/g;
+    var best = null;
+    var totalLineAmount = null;
+    lines.forEach(function(line){
+      var isTotalLine = /total|amount due|balance/i.test(line) && !/subtotal/i.test(line);
+      var m, matches = [];
+      while((m = amountRegex.exec(line)) !== null){ matches.push(parseFloat(m[1].replace(",", "."))); }
+      matches.forEach(function(val){
+        if(isNaN(val)) return;
+        if(isTotalLine) totalLineAmount = val;
+        if(best === null || val > best) best = val;
+      });
+    });
+    var amount = totalLineAmount !== null ? totalLineAmount : best;
+    return { merchant: merchant, amount: amount };
+  }
+
+  function showOcrConfirm(resultBox, imgUrl, parsed){
+    var guess = guessCategoryId(parsed.merchant) || (state.categories[0] && state.categories[0].id);
+    resultBox.innerHTML =
+      '<img class="photo-preview" src="'+imgUrl+'">' +
+      '<div class="ocr-note" style="margin-bottom:12px;">Here\'s what we could read — check it over before saving.</div>' +
+      '<div class="field"><label>Merchant</label><input type="text" id="ocr-merchant" value="'+escapeHtml(parsed.merchant||"")+'"></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Amount (£)</label><input type="number" step="0.01" id="ocr-amount" value="'+(parsed.amount!=null?parsed.amount:"")+'"></div>' +
+        '<div class="field"><label>Date</label><input type="date" id="ocr-date" value="'+fmtISO(new Date())+'"></div>' +
+      '</div>' +
+      '<div class="field"><label>Category</label><select id="ocr-category"></select></div>' +
+      '<button class="primary-btn" id="ocrSaveBtn">Save transaction</button>' +
+      '<button class="ghost-btn" id="ocrRetryBtn">Use a different photo</button>';
+
+    populateCategorySelect(document.getElementById("ocr-category"), guess);
+
+    document.getElementById("ocr-merchant").addEventListener("input", function(){
+      var g = guessCategoryId(this.value);
+      if(g) document.getElementById("ocr-category").value = g;
+    });
+
+    document.getElementById("ocrSaveBtn").addEventListener("click", function(){
+      var merchant = document.getElementById("ocr-merchant").value.trim();
+      var amount = parseFloat(document.getElementById("ocr-amount").value);
+      var date = document.getElementById("ocr-date").value;
+      var categoryId = document.getElementById("ocr-category").value;
+      if(!merchant || isNaN(amount) || !date){ alert("Please fill in merchant, amount and date."); return; }
+      state.transactions.push({ id: uid(), merchant: merchant, amount: amount, date: date, categoryId: categoryId, note: "", createdAt: Date.now() });
+      saveState();
+      addOverlay.classList.remove("open");
+      render();
+    });
+    document.getElementById("ocrRetryBtn").addEventListener("click", function(){
+      document.getElementById("photoInput").value = "";
+      resultBox.innerHTML = "";
+    });
+  }
+
+  function showOcrFailure(resultBox, imgUrl){
+    resultBox.innerHTML =
+      '<img class="photo-preview" src="'+imgUrl+'">' +
+      '<div class="ocr-note" style="margin-bottom:12px;">Couldn\'t read that automatically — no problem, just fill it in.</div>' +
+      '<button class="primary-btn" id="ocrManualBtn">Enter details manually</button>';
+    document.getElementById("ocrManualBtn").addEventListener("click", function(){ switchTab("manual"); });
+  }
+
+  // ---------- settings: categories ----------
+  var settingsOverlay = document.getElementById("settingsOverlay");
+  document.getElementById("settingsBtn").addEventListener("click", function(){
+    renderCategoryList(); renderRuleList();
+    settingsOverlay.classList.add("open");
+  });
+  settingsOverlay.addEventListener("click", function(e){ if(e.target === settingsOverlay) settingsOverlay.classList.remove("open"); });
+
+  function renderCategoryList(){
+    var box = document.getElementById("categoryList");
+    box.innerHTML = "";
+    state.categories.forEach(function(c){
+      var row = document.createElement("div");
+      row.className = "cat-row";
+      row.innerHTML =
+        '<input type="color" value="'+c.color+'">' +
+        '<input type="text" value="'+escapeHtml(c.name)+'">' +
+        '<button class="small-x" title="Remove">✕</button>';
+      var colorInput = row.querySelector('input[type=color]');
+      var textInput = row.querySelector('input[type=text]');
+      var delBtn = row.querySelector('.small-x');
+      colorInput.addEventListener("change", function(){ c.color = colorInput.value; saveState(); render(); });
+      textInput.addEventListener("change", function(){ c.name = textInput.value.trim() || c.name; saveState(); render(); });
+      delBtn.addEventListener("click", function(){
+        if(state.categories.length <= 1) return;
+        state.categories = state.categories.filter(function(x){ return x.id !== c.id; });
+        state.rules = state.rules.filter(function(r){ return r.categoryId !== c.id; });
+        saveState(); renderCategoryList(); renderRuleList(); render();
+      });
+      box.appendChild(row);
+    });
+  }
+  document.getElementById("addCategoryBtn").addEventListener("click", function(){
+    var name = prompt("New category name:");
+    if(!name) return;
+    var palette = ["#7cd992","#ffb86b","#7b5cfa","#ff8fa3","#6fd3f0","#f2c94c","#96939f","#d98cff","#6bd0a3"];
+    var color = palette[state.categories.length % palette.length];
+    state.categories.push({ id: uid(), name: name.trim(), color: color });
+    saveState(); renderCategoryList(); render();
+  });
+
+  // ---------- settings: rules ----------
+  function renderRuleList(){
+    var box = document.getElementById("ruleList");
+    box.innerHTML = "";
+    state.rules.forEach(function(r, idx){
+      var row = document.createElement("div");
+      row.className = "rule-row";
+      row.innerHTML =
+        '<input type="text" placeholder="merchant contains…" value="'+escapeHtml(r.keyword)+'">' +
+        '<select></select>' +
+        '<button class="small-x" title="Remove">✕</button>';
+      var textInput = row.querySelector('input');
+      var sel = row.querySelector('select');
+      var delBtn = row.querySelector('.small-x');
+      populateCategorySelect(sel, r.categoryId);
+      textInput.addEventListener("change", function(){ r.keyword = textInput.value.trim(); saveState(); });
+      sel.addEventListener("change", function(){ r.categoryId = sel.value; saveState(); });
+      delBtn.addEventListener("click", function(){
+        state.rules.splice(idx,1); saveState(); renderRuleList();
+      });
+      box.appendChild(row);
+    });
+  }
+  document.getElementById("addRuleBtn").addEventListener("click", function(){
+    state.rules.push({ keyword: "", categoryId: state.categories[0].id });
+    saveState(); renderRuleList();
+  });
+
+  // ---------- init ----------
+  render();
+})();
+</script>
+</body>
+</html>
